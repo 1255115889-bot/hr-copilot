@@ -1,0 +1,986 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>HR Copilot - AI员工政策顾问</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<style>
+* { font-family: 'Inter', sans-serif; }
+.material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; font-family: 'Material Symbols Outlined'; }
+.fill-icon { font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-thumb { background: #c3c6d7; border-radius: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+.ai-glow { box-shadow: 0 0 20px rgba(113,42,226,0.12); }
+.chat-max { max-width: 780px; }
+.typing span { display:inline-block; width:7px; height:7px; border-radius:50%; background:#712ae2; margin:0 2px; animation: bounce 1.2s infinite; }
+.typing span:nth-child(2){animation-delay:.2s}
+.typing span:nth-child(3){animation-delay:.4s}
+@keyframes bounce { 0%,80%,100%{transform:translateY(0)} 40%{transform:translateY(-8px)} }
+.card-action { border: 1.5px solid #004ac6; }
+.card-info { border: 1.5px solid #c3c6d7; background:#eff4ff; }
+.card-alert { border: 1.5px solid #ba1a1a; background:#fff5f5; }
+.page { display:none; }
+.page.active { display:flex; }
+.nav-item.active { background:#e5eeff; color:#004ac6; font-weight:600; }
+.nav-item.active .material-symbols-outlined { font-variation-settings: 'FILL' 1, 'wght' 500, 'GRAD' 0, 'opsz' 24; }
+.fade-in { animation: fadeIn .3s ease; }
+@keyframes fadeIn { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
+.tag-badge { font-size:11px; font-weight:600; letter-spacing:.04em; }
+.prose-ai p { margin-bottom:.6em; line-height:1.65; }
+.prose-ai strong { color:#0b1c30; }
+.streaming-cursor::after { content:'▋'; animation:blink .7s infinite; color:#712ae2; }
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
+.modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,.4); z-index:100; display:flex; align-items:center; justify-content:center; }
+.modal-box { background:#fff; border-radius:16px; padding:32px; width:480px; max-width:90vw; box-shadow:0 20px 60px rgba(0,0,0,.15); }
+/* 移动端底部抽屉 */
+.drawer-overlay { position:fixed; inset:0; background:rgba(0,0,0,.4); z-index:80; display:none; }
+.drawer-overlay.open { display:block; }
+.mobile-drawer { position:fixed; bottom:0; left:0; right:0; background:#eff4ff; border-radius:20px 20px 0 0; z-index:90; padding:16px; max-height:80vh; overflow-y:auto; transform:translateY(100%); transition:transform .3s cubic-bezier(.4,0,.2,1); }
+.mobile-drawer.open { transform:translateY(0); }
+.drawer-handle { width:40px; height:4px; background:#c3c6d7; border-radius:2px; margin:0 auto 16px; }
+/* 底部 Tab Bar（移动端）*/
+.tab-bar { display:none; }
+@media (max-width: 640px) {
+  .sidebar-desktop { display:none !important; }
+  .tab-bar { display:flex; position:fixed; bottom:0; left:0; right:0; background:#fff; border-top:1px solid #c3c6d7; z-index:70; padding-bottom:env(safe-area-inset-bottom); }
+  .tab-bar-item { flex:1; display:flex; flex-direction:column; align-items:center; gap:2px; padding:8px 4px; font-size:10px; color:#737686; cursor:pointer; transition:color .2s; border:none; background:none; }
+  .tab-bar-item.active { color:#004ac6; }
+  .tab-bar-item.active .material-symbols-outlined { font-variation-settings: "FILL" 1, "wght" 500, "GRAD" 0, "opsz" 24; }
+  .main-content { padding-bottom:60px !important; }
+  .chat-input-area { padding-bottom:calc(60px + env(safe-area-inset-bottom)) !important; }
+  .chat-max { max-width:100% !important; }
+  .header-subtitle { display:none; }
+  .header-divider { display:none; }
+  .modal-box { padding:20px; border-radius:20px 20px 0 0; position:fixed; bottom:0; left:0; right:0; width:100% !important; max-width:100% !important; border-radius:20px 20px 0 0; }
+  .modal-overlay { align-items:flex-end; }
+  .analytics-grid { grid-template-columns: repeat(2,1fr) !important; }
+}
+</style>
+</head>
+<body class="bg-[#f8f9ff] text-[#0b1c30] overflow-hidden h-screen flex flex-col">
+
+<!-- Top Nav -->
+<header class="bg-white border-b border-[#c3c6d7] flex items-center justify-between px-4 py-3 shrink-0 z-50">
+  <div class="flex items-center gap-2">
+    <!-- 移动端菜单按钮 -->
+    <button onclick="openDrawer()" class="sm:hidden w-8 h-8 flex items-center justify-center rounded-xl text-[#004ac6] hover:bg-[#eff4ff] transition">
+      <span class="material-symbols-outlined text-[22px]">menu</span>
+    </button>
+    <div class="w-8 h-8 bg-[#004ac6] rounded-xl flex items-center justify-center">
+      <span class="material-symbols-outlined text-white text-[18px]">psychology</span>
+    </div>
+    <span class="text-lg font-bold text-[#004ac6] tracking-tight">HR Copilot</span>
+    <div class="h-5 w-px bg-[#c3c6d7] mx-1 header-divider"></div>
+    <span class="text-sm text-[#737686] header-subtitle">AI员工政策顾问</span>
+  </div>
+  <div class="flex items-center gap-2">
+    <button onclick="toggleRole()" id="role-btn"
+      class="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#e5eeff] border border-[#b4c5ff] text-[#004ac6] font-semibold text-xs hover:bg-[#dbe1ff] transition-all">
+      <span class="material-symbols-outlined text-[14px]">badge</span>
+      <span id="role-label">员工模式</span>
+      <span class="material-symbols-outlined text-[12px]">swap_horiz</span>
+    </button>
+    <div class="w-8 h-8 rounded-full bg-[#dbe1ff] flex items-center justify-center text-[#004ac6] font-bold text-sm">张</div>
+  </div>
+</header>
+
+<div class="flex flex-1 overflow-hidden">
+
+<!-- Sidebar -->
+<aside class="sidebar-desktop w-[230px] bg-[#eff4ff] border-r border-[#c3c6d7] flex flex-col shrink-0 p-3 gap-1">
+  <!-- Employee Nav -->
+  <div id="nav-employee" class="flex flex-col gap-1 flex-1">
+    <p class="text-[11px] font-bold text-[#737686] uppercase tracking-widest px-3 py-2 mt-1">员工服务</p>
+    <button onclick="showPage('chat')" class="nav-item active flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all w-full text-left" data-page="chat">
+      <span class="material-symbols-outlined text-[20px]">chat</span> AI 问答助手
+    </button>
+    <button onclick="showPage('workflow')" class="nav-item flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all w-full text-left text-[#434655] hover:bg-[#e5eeff]" data-page="workflow">
+      <span class="material-symbols-outlined text-[20px]">task_alt</span> 我的申请
+    </button>
+    <div class="border-t border-[#c3c6d7] my-2"></div>
+    <p class="text-[11px] font-bold text-[#737686] uppercase tracking-widest px-3 py-1">快捷入口</p>
+    <button onclick="quickApply('在职证明')" class="flex items-center gap-3 px-3 py-2 rounded-xl text-sm transition-all text-[#434655] hover:bg-[#e5eeff]">
+      <span class="material-symbols-outlined text-[18px]">description</span> 申请在职证明
+    </button>
+    <button onclick="quickApply('收入证明')" class="flex items-center gap-3 px-3 py-2 rounded-xl text-sm transition-all text-[#434655] hover:bg-[#e5eeff]">
+      <span class="material-symbols-outlined text-[18px]">payments</span> 申请收入证明
+    </button>
+    <button onclick="quickApply('请假申请')" class="flex items-center gap-3 px-3 py-2 rounded-xl text-sm transition-all text-[#434655] hover:bg-[#e5eeff]">
+      <span class="material-symbols-outlined text-[18px]">calendar_today</span> 发起请假
+    </button>
+  </div>
+
+  <!-- HR Nav -->
+  <div id="nav-hr" class="flex-col gap-1 flex-1 hidden">
+    <p class="text-[11px] font-bold text-[#737686] uppercase tracking-widest px-3 py-2 mt-1">HR管理</p>
+    <button onclick="showPage('hr-knowledge')" class="nav-item flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all w-full text-left text-[#434655] hover:bg-[#e5eeff]" data-page="hr-knowledge">
+      <span class="material-symbols-outlined text-[20px]">menu_book</span> 知识库管理
+    </button>
+    <button onclick="showPage('hr-approval')" class="nav-item flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all w-full text-left text-[#434655] hover:bg-[#e5eeff]" data-page="hr-approval">
+      <span class="material-symbols-outlined text-[20px]">verified</span> 审批中心
+    </button>
+    <button onclick="showPage('hr-analytics')" class="nav-item flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all w-full text-left text-[#434655] hover:bg-[#e5eeff]" data-page="hr-analytics">
+      <span class="material-symbols-outlined text-[20px]">analytics</span> 数据统计
+    </button>
+  </div>
+
+  <!-- Bottom -->
+  <div class="border-t border-[#c3c6d7] pt-2 mt-auto flex flex-col gap-1">
+    <div class="flex items-center gap-2 px-3 py-2">
+      <div class="w-6 h-6 rounded-full bg-green-100 flex items-center justify-center">
+        <div class="w-2 h-2 rounded-full bg-green-500"></div>
+      </div>
+      <div>
+        <p class="text-xs font-semibold">张三</p>
+        <p class="text-[10px] text-[#737686]">技术部 · 在职</p>
+      </div>
+    </div>
+  </div>
+</aside>
+
+<!-- 移动端抽屉遮罩 -->
+<div class="drawer-overlay" id="drawer-overlay" onclick="closeDrawer()"></div>
+
+<!-- 移动端侧边抽屉 -->
+<div class="mobile-drawer" id="mobile-drawer">
+  <div class="drawer-handle"></div>
+  <div id="drawer-nav-employee" class="flex flex-col gap-1">
+    <p class="text-[11px] font-bold text-[#737686] uppercase tracking-widest px-2 py-1">员工服务</p>
+    <button onclick="showPage('chat');closeDrawer()" class="nav-item-m flex items-center gap-3 px-3 py-3 rounded-xl text-sm text-[#434655] active:bg-[#e5eeff] w-full text-left">
+      <span class="material-symbols-outlined text-[20px] text-[#004ac6]">chat</span> AI 问答助手
+    </button>
+    <button onclick="showPage('workflow');closeDrawer()" class="nav-item-m flex items-center gap-3 px-3 py-3 rounded-xl text-sm text-[#434655] active:bg-[#e5eeff] w-full text-left">
+      <span class="material-symbols-outlined text-[20px] text-[#737686]">task_alt</span> 我的申请
+    </button>
+    <div class="border-t border-[#c3c6d7] my-2"></div>
+    <p class="text-[11px] font-bold text-[#737686] uppercase tracking-widest px-2 py-1">快捷入口</p>
+    <button onclick="quickApply('在职证明');closeDrawer()" class="flex items-center gap-3 px-3 py-3 rounded-xl text-sm text-[#434655] active:bg-[#e5eeff] w-full text-left">
+      <span class="material-symbols-outlined text-[18px] text-[#737686]">description</span> 申请在职证明
+    </button>
+    <button onclick="quickApply('收入证明');closeDrawer()" class="flex items-center gap-3 px-3 py-3 rounded-xl text-sm text-[#434655] active:bg-[#e5eeff] w-full text-left">
+      <span class="material-symbols-outlined text-[18px] text-[#737686]">payments</span> 申请收入证明
+    </button>
+    <button onclick="quickApply('请假申请');closeDrawer()" class="flex items-center gap-3 px-3 py-3 rounded-xl text-sm text-[#434655] active:bg-[#e5eeff] w-full text-left">
+      <span class="material-symbols-outlined text-[18px] text-[#737686]">calendar_today</span> 发起请假
+    </button>
+  </div>
+  <div id="drawer-nav-hr" class="flex-col gap-1 hidden">
+    <p class="text-[11px] font-bold text-[#737686] uppercase tracking-widest px-2 py-1">HR管理</p>
+    <button onclick="showPage('hr-knowledge');closeDrawer()" class="flex items-center gap-3 px-3 py-3 rounded-xl text-sm text-[#434655] active:bg-[#e5eeff] w-full text-left">
+      <span class="material-symbols-outlined text-[20px] text-[#737686]">menu_book</span> 知识库管理
+    </button>
+    <button onclick="showPage('hr-approval');closeDrawer()" class="flex items-center gap-3 px-3 py-3 rounded-xl text-sm text-[#434655] active:bg-[#e5eeff] w-full text-left">
+      <span class="material-symbols-outlined text-[20px] text-[#737686]">verified</span> 审批中心
+    </button>
+    <button onclick="showPage('hr-analytics');closeDrawer()" class="flex items-center gap-3 px-3 py-3 rounded-xl text-sm text-[#434655] active:bg-[#e5eeff] w-full text-left">
+      <span class="material-symbols-outlined text-[20px] text-[#737686]">analytics</span> 数据统计
+    </button>
+  </div>
+  <div class="flex items-center gap-2 px-3 py-3 mt-2 border-t border-[#c3c6d7]">
+    <div class="w-2 h-2 rounded-full bg-green-500"></div>
+    <span class="text-sm font-semibold">张三</span>
+    <span class="text-xs text-[#737686]">技术部 · 在职</span>
+  </div>
+</div>
+
+<!-- 移动端底部 Tab Bar -->
+<div class="tab-bar" id="tab-bar">
+  <button class="tab-bar-item active" data-tab="chat" onclick="showPage('chat');setActiveTab('chat')">
+    <span class="material-symbols-outlined text-[22px]">chat</span>
+    <span>问答</span>
+  </button>
+  <button class="tab-bar-item" data-tab="workflow" onclick="showPage('workflow');setActiveTab('workflow')">
+    <span class="material-symbols-outlined text-[22px]">task_alt</span>
+    <span>申请</span>
+  </button>
+  <button class="tab-bar-item" id="tab-hr-knowledge" data-tab="hr-knowledge" onclick="showPage('hr-knowledge');setActiveTab('hr-knowledge')" style="display:none">
+    <span class="material-symbols-outlined text-[22px]">menu_book</span>
+    <span>知识库</span>
+  </button>
+  <button class="tab-bar-item" id="tab-hr-approval" data-tab="hr-approval" onclick="showPage('hr-approval');setActiveTab('hr-approval')" style="display:none">
+    <span class="material-symbols-outlined text-[22px]">verified</span>
+    <span>审批</span>
+  </button>
+  <button class="tab-bar-item" id="tab-hr-analytics" data-tab="hr-analytics" onclick="showPage('hr-analytics');setActiveTab('hr-analytics')" style="display:none">
+    <span class="material-symbols-outlined text-[22px]">analytics</span>
+    <span>统计</span>
+  </button>
+  <button class="tab-bar-item" onclick="openDrawer()">
+    <span class="material-symbols-outlined text-[22px]">more_horiz</span>
+    <span>更多</span>
+  </button>
+</div>
+
+<!-- Main -->
+<main class="flex-1 overflow-hidden flex flex-col">
+
+  <!-- ===== PAGE: CHAT ===== -->
+  <div id="page-chat" class="page active flex-col flex-1 overflow-hidden">
+    <!-- Chat messages -->
+    <div id="chat-messages" class="flex-1 overflow-y-auto px-4 py-4 main-content">
+      <div class="chat-max mx-auto space-y-6">
+        <!-- Welcome -->
+        <div class="fade-in flex flex-col items-start gap-3">
+          <div class="flex items-center gap-2">
+            <div class="w-8 h-8 rounded-xl bg-[#712ae2] flex items-center justify-center ai-glow">
+              <span class="material-symbols-outlined text-white text-[18px]">smart_toy</span>
+            </div>
+            <span class="text-sm font-bold text-[#712ae2]">HR Copilot</span>
+          </div>
+          <div class="bg-white border-l-4 border-[#712ae2] rounded-r-2xl shadow-sm border border-[#c3c6d7] px-5 py-4 max-w-[85%] ai-glow">
+            <p class="text-sm text-[#0b1c30] leading-relaxed">你好！我是 HR Copilot，你的专属 HR 政策助手。👋</p>
+            <p class="text-sm text-[#434655] leading-relaxed mt-2">我可以帮你解答公司的各类 HR 政策问题，包括请假制度、薪酬福利、社保公积金、合同管理等，所有回答均基于公司正式政策文件。</p>
+            <p class="text-sm text-[#004ac6] font-medium mt-2">💡 有什么想问的？直接输入就好~</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Suggestions + Input -->
+    <div class="border-t border-[#c3c6d7] bg-white px-4 py-3 chat-input-area">
+      <div class="chat-max mx-auto space-y-3">
+        <div class="flex flex-wrap gap-2">
+          <button onclick="fillInput('年假有多少天？')" class="text-xs px-3 py-1.5 rounded-full border border-[#c3c6d7] text-[#434655] hover:border-[#004ac6] hover:text-[#004ac6] transition-all">📅 年假有多少天？</button>
+          <button onclick="fillInput('加班费怎么计算？')" class="text-xs px-3 py-1.5 rounded-full border border-[#c3c6d7] text-[#434655] hover:border-[#004ac6] hover:text-[#004ac6] transition-all">💰 加班费怎么计算？</button>
+          <button onclick="fillInput('我想申请在职证明')" class="text-xs px-3 py-1.5 rounded-full border border-[#c3c6d7] text-[#434655] hover:border-[#004ac6] hover:text-[#004ac6] transition-all">📄 申请在职证明</button>
+          <button onclick="fillInput('社保公积金怎么缴？')" class="text-xs px-3 py-1.5 rounded-full border border-[#c3c6d7] text-[#434655] hover:border-[#004ac6] hover:text-[#004ac6] transition-all">🏦 社保公积金</button>
+          <button onclick="fillInput('工资什么时候发？')" class="text-xs px-3 py-1.5 rounded-full border border-[#c3c6d7] text-[#434655] hover:border-[#004ac6] hover:text-[#004ac6] transition-all">💳 发薪日</button>
+        </div>
+        <div class="relative flex items-center">
+          <input id="chat-input" type="text" placeholder="输入你的HR政策问题..."
+            class="w-full pl-4 pr-20 py-3.5 rounded-2xl border border-[#c3c6d7] focus:border-[#004ac6] focus:ring-0 focus:outline-none bg-[#f8f9ff] text-sm transition-all shadow-sm"
+            onkeydown="if(event.key==='Enter')sendMessage()"/>
+          <button onclick="sendMessage()" id="send-btn"
+            class="absolute right-2 bg-[#004ac6] text-white px-4 py-2 rounded-xl text-sm font-semibold hover:bg-[#003ea8] transition-all active:scale-95 flex items-center gap-1">
+            <span class="material-symbols-outlined text-[16px]">send</span>
+          </button>
+        </div>
+        <p class="text-[10px] text-[#737686] text-center">所有回答均基于公司政策知识库 · 如有疑问请联系 HR 确认</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== PAGE: WORKFLOW ===== -->
+  <div id="page-workflow" class="page flex-col flex-1 overflow-hidden">
+    <div class="px-6 py-5 border-b border-[#c3c6d7] bg-white flex items-center justify-between">
+      <div>
+        <h1 class="text-xl font-bold">我的申请</h1>
+        <p class="text-sm text-[#737686] mt-0.5">查看和管理你提交的业务申请</p>
+      </div>
+      <button onclick="showApplyModal('在职证明')" class="flex items-center gap-2 bg-[#004ac6] text-white px-4 py-2 rounded-xl text-sm font-semibold hover:bg-[#003ea8] transition-all">
+        <span class="material-symbols-outlined text-[16px]">add</span> 新建申请
+      </button>
+    </div>
+    <div class="flex-1 overflow-y-auto p-6">
+      <div id="my-applications" class="max-w-3xl mx-auto space-y-3"></div>
+    </div>
+  </div>
+
+  <!-- ===== PAGE: HR KNOWLEDGE ===== -->
+  <div id="page-hr-knowledge" class="page flex-col flex-1 overflow-hidden">
+    <div class="px-6 py-5 border-b border-[#c3c6d7] bg-white flex items-center justify-between">
+      <div>
+        <h1 class="text-xl font-bold">知识库管理</h1>
+        <p class="text-sm text-[#737686] mt-0.5">维护 HR 政策知识库，支持员工 AI 问答</p>
+      </div>
+      <button onclick="showAddKBModal()" class="flex items-center gap-2 bg-[#004ac6] text-white px-4 py-2 rounded-xl text-sm font-semibold hover:bg-[#003ea8] transition-all">
+        <span class="material-symbols-outlined text-[16px]">add</span> 添加条目
+      </button>
+    </div>
+    <div class="p-4 border-b border-[#c3c6d7] bg-white">
+      <div class="flex gap-3 max-w-xl">
+        <input id="kb-search" type="text" placeholder="搜索知识库..." onkeyup="loadKB()" class="flex-1 px-3 py-2 text-sm border border-[#c3c6d7] rounded-xl focus:outline-none focus:border-[#004ac6]"/>
+        <select id="kb-category" onchange="loadKB()" class="px-3 py-2 text-sm border border-[#c3c6d7] rounded-xl focus:outline-none">
+          <option value="">全部分类</option>
+          <option>休假</option><option>薪酬</option><option>社保</option><option>考勤</option><option>合同</option><option>福利</option>
+        </select>
+      </div>
+    </div>
+    <div class="flex-1 overflow-y-auto p-6">
+      <div id="kb-list" class="max-w-4xl mx-auto space-y-3"></div>
+    </div>
+  </div>
+
+  <!-- ===== PAGE: HR APPROVAL ===== -->
+  <div id="page-hr-approval" class="page flex-col flex-1 overflow-hidden">
+    <div class="px-6 py-5 border-b border-[#c3c6d7] bg-white">
+      <h1 class="text-xl font-bold">审批中心</h1>
+      <p class="text-sm text-[#737686] mt-0.5">处理员工提交的各类业务申请</p>
+    </div>
+    <div class="p-4 border-b border-[#c3c6d7] bg-white flex gap-2">
+      <button onclick="filterApps('')" class="app-filter-btn active px-4 py-1.5 rounded-full text-sm font-medium border border-[#c3c6d7] transition-all" data-filter="">全部</button>
+      <button onclick="filterApps('pending')" class="app-filter-btn px-4 py-1.5 rounded-full text-sm font-medium border border-[#c3c6d7] text-[#737686] transition-all" data-filter="pending">待审批</button>
+      <button onclick="filterApps('approved')" class="app-filter-btn px-4 py-1.5 rounded-full text-sm font-medium border border-[#c3c6d7] text-[#737686] transition-all" data-filter="approved">已通过</button>
+      <button onclick="filterApps('rejected')" class="app-filter-btn px-4 py-1.5 rounded-full text-sm font-medium border border-[#c3c6d7] text-[#737686] transition-all" data-filter="rejected">已拒绝</button>
+    </div>
+    <div class="flex-1 overflow-y-auto p-6">
+      <div id="approval-list" class="max-w-4xl mx-auto space-y-3"></div>
+    </div>
+  </div>
+
+  <!-- ===== PAGE: HR ANALYTICS ===== -->
+  <div id="page-hr-analytics" class="page flex-col flex-1 overflow-hidden">
+    <div class="px-6 py-5 border-b border-[#c3c6d7] bg-white">
+      <h1 class="text-xl font-bold">数据统计</h1>
+      <p class="text-sm text-[#737686] mt-0.5">系统使用情况与服务质量概览</p>
+    </div>
+    <div class="flex-1 overflow-y-auto p-6">
+      <div id="analytics-content" class="max-w-4xl mx-auto"></div>
+    </div>
+  </div>
+
+</main>
+</div>
+
+<!-- Apply Modal -->
+<div id="apply-modal" class="modal-overlay hidden">
+  <div class="modal-box">
+    <div class="flex items-center justify-between mb-6">
+      <h2 class="text-lg font-bold" id="modal-title">发起申请</h2>
+      <button onclick="closeModal()" class="text-[#737686] hover:text-[#0b1c30] transition">
+        <span class="material-symbols-outlined">close</span>
+      </button>
+    </div>
+    <div class="space-y-4">
+      <div>
+        <label class="block text-sm font-medium text-[#434655] mb-1.5">申请类型</label>
+        <select id="modal-type" class="w-full px-3 py-2.5 border border-[#c3c6d7] rounded-xl text-sm focus:outline-none focus:border-[#004ac6]">
+          <option>在职证明</option><option>收入证明</option><option>请假申请</option><option>薪资异常申诉</option><option>考勤异常申诉</option>
+        </select>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-[#434655] mb-1.5">申请人姓名</label>
+        <input id="modal-name" type="text" value="张三" class="w-full px-3 py-2.5 border border-[#c3c6d7] rounded-xl text-sm focus:outline-none focus:border-[#004ac6]"/>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-[#434655] mb-1.5">部门</label>
+        <input id="modal-dept" type="text" value="技术部" class="w-full px-3 py-2.5 border border-[#c3c6d7] rounded-xl text-sm focus:outline-none focus:border-[#004ac6]"/>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-[#434655] mb-1.5">申请说明</label>
+        <textarea id="modal-note" rows="3" placeholder="请简要说明申请原因..." class="w-full px-3 py-2.5 border border-[#c3c6d7] rounded-xl text-sm focus:outline-none focus:border-[#004ac6] resize-none"></textarea>
+      </div>
+    </div>
+    <div class="flex gap-3 mt-6">
+      <button onclick="closeModal()" class="flex-1 py-2.5 border border-[#c3c6d7] rounded-xl text-sm font-medium text-[#434655] hover:bg-[#f8f9ff] transition">取消</button>
+      <button onclick="submitApplication()" class="flex-1 py-2.5 bg-[#004ac6] text-white rounded-xl text-sm font-semibold hover:bg-[#003ea8] transition active:scale-95">提交申请</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add KB Modal -->
+<div id="kb-modal" class="modal-overlay hidden">
+  <div class="modal-box" style="width:560px">
+    <div class="flex items-center justify-between mb-6">
+      <h2 class="text-lg font-bold">添加知识库条目</h2>
+      <button onclick="closeKBModal()" class="text-[#737686] hover:text-[#0b1c30] transition">
+        <span class="material-symbols-outlined">close</span>
+      </button>
+    </div>
+    <div class="space-y-4">
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label class="block text-sm font-medium text-[#434655] mb-1.5">分类</label>
+          <select id="kb-new-category" class="w-full px-3 py-2.5 border border-[#c3c6d7] rounded-xl text-sm focus:outline-none focus:border-[#004ac6]">
+            <option>休假</option><option>薪酬</option><option>社保</option><option>考勤</option><option>合同</option><option>福利</option><option>其他</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-[#434655] mb-1.5">政策来源</label>
+          <input id="kb-new-policy" type="text" placeholder="如：《xxx制度》第x条" class="w-full px-3 py-2.5 border border-[#c3c6d7] rounded-xl text-sm focus:outline-none focus:border-[#004ac6]"/>
+        </div>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-[#434655] mb-1.5">问题</label>
+        <input id="kb-new-q" type="text" placeholder="员工常问的问题..." class="w-full px-3 py-2.5 border border-[#c3c6d7] rounded-xl text-sm focus:outline-none focus:border-[#004ac6]"/>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-[#434655] mb-1.5">标准答案</label>
+        <textarea id="kb-new-a" rows="4" placeholder="政策规定的标准回答..." class="w-full px-3 py-2.5 border border-[#c3c6d7] rounded-xl text-sm focus:outline-none focus:border-[#004ac6] resize-none"></textarea>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-[#434655] mb-1.5">关键词标签（逗号分隔）</label>
+        <input id="kb-new-tags" type="text" placeholder="如：年假,带薪休假" class="w-full px-3 py-2.5 border border-[#c3c6d7] rounded-xl text-sm focus:outline-none focus:border-[#004ac6]"/>
+      </div>
+    </div>
+    <div class="flex gap-3 mt-6">
+      <button onclick="closeKBModal()" class="flex-1 py-2.5 border border-[#c3c6d7] rounded-xl text-sm font-medium text-[#434655] hover:bg-[#f8f9ff] transition">取消</button>
+      <button onclick="submitKB()" class="flex-1 py-2.5 bg-[#004ac6] text-white rounded-xl text-sm font-semibold hover:bg-[#003ea8] transition active:scale-95">添加条目</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// 动态计算API基础路径，兼容任意子目录部署
+const BASE_URL = '/hr';
+// ============================================================
+// State
+// ============================================================
+let currentRole = 'employee'; // employee | hr
+let chatHistory = [];
+let currentPage = 'chat';
+let appFilterStatus = '';
+
+// ============================================================
+// 移动端抽屉
+// ============================================================
+function openDrawer() {
+  document.getElementById('mobile-drawer').classList.add('open');
+  document.getElementById('drawer-overlay').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+function closeDrawer() {
+  document.getElementById('mobile-drawer').classList.remove('open');
+  document.getElementById('drawer-overlay').classList.remove('open');
+  document.body.style.overflow = '';
+}
+
+// Tab Bar
+function setActiveTab(page) {
+  document.querySelectorAll('.tab-bar-item').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.tab === page);
+  });
+}
+
+// ============================================================
+// Role Toggle
+// ============================================================
+function toggleRole() {
+  currentRole = currentRole === 'employee' ? 'hr' : 'employee';
+  const label = document.getElementById('role-label');
+  const empNav = document.getElementById('nav-employee');
+  const hrNav = document.getElementById('nav-hr');
+  const drawerEmp = document.getElementById('drawer-nav-employee');
+  const drawerHr = document.getElementById('drawer-nav-hr');
+  // HR Tab Bar 按钮
+  const hrTabs = ['tab-hr-knowledge','tab-hr-approval','tab-hr-analytics'];
+  const empTabs = document.querySelectorAll('.tab-bar-item[data-tab="chat"],.tab-bar-item[data-tab="workflow"]');
+  if (currentRole === 'hr') {
+    label.textContent = 'HR 管理员';
+    empNav.classList.add('hidden');
+    hrNav.classList.remove('hidden');
+    hrNav.classList.add('flex');
+    if(drawerEmp) drawerEmp.classList.add('hidden');
+    if(drawerHr) { drawerHr.classList.remove('hidden'); drawerHr.classList.add('flex'); }
+    hrTabs.forEach(id => { const el=document.getElementById(id); if(el) el.style.display=''; });
+    empTabs.forEach(el => el.style.display='none');
+    showPage('hr-knowledge');
+    setActiveTab('hr-knowledge');
+  } else {
+    label.textContent = '员工模式';
+    hrNav.classList.add('hidden');
+    hrNav.classList.remove('flex');
+    empNav.classList.remove('hidden');
+    if(drawerHr) { drawerHr.classList.add('hidden'); drawerHr.classList.remove('flex'); }
+    if(drawerEmp) drawerEmp.classList.remove('hidden');
+    hrTabs.forEach(id => { const el=document.getElementById(id); if(el) el.style.display='none'; });
+    empTabs.forEach(el => el.style.display='');
+    showPage('chat');
+    setActiveTab('chat');
+  }
+}
+
+// ============================================================
+// Page Navigation
+// ============================================================
+function showPage(page) {
+  currentPage = page;
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  const pageEl = document.getElementById('page-' + page);
+  if (pageEl) pageEl.classList.add('active');
+  const navEl = document.querySelector(`.nav-item[data-page="${page}"]`);
+  if (navEl) navEl.classList.add('active');
+  // Load data
+  if (page === 'workflow') loadMyApplications();
+  if (page === 'hr-knowledge') loadKB();
+  if (page === 'hr-approval') loadApprovals();
+  if (page === 'hr-analytics') loadAnalytics();
+}
+
+// ============================================================
+// Chat
+// ============================================================
+function fillInput(text) {
+  document.getElementById('chat-input').value = text;
+  document.getElementById('chat-input').focus();
+}
+
+function sendMessage() {
+  const input = document.getElementById('chat-input');
+  const query = input.value.trim();
+  if (!query) return;
+  input.value = '';
+  
+  // Add user message
+  appendUserMessage(query);
+  chatHistory.push({role:'user', content: query});
+  
+  // Show typing
+  const typingId = appendTyping();
+  
+  // Stream from API
+  streamChat(query, typingId);
+}
+
+function appendUserMessage(text) {
+  const container = document.getElementById('chat-messages').querySelector('.space-y-6');
+  const time = new Date().toLocaleTimeString('zh-CN', {hour:'2-digit', minute:'2-digit'});
+  const div = document.createElement('div');
+  div.className = 'fade-in flex flex-col items-end gap-1';
+  div.innerHTML = `
+    <div class="bg-[#004ac6] text-white px-5 py-3.5 rounded-2xl rounded-tr-none max-w-[75%] shadow-sm">
+      <p class="text-sm leading-relaxed">${escHtml(text)}</p>
+    </div>
+    <span class="text-[10px] text-[#737686]">${time}</span>`;
+  container.appendChild(div);
+  scrollToBottom();
+}
+
+function appendTyping() {
+  const id = 'typing-' + Date.now();
+  const container = document.getElementById('chat-messages').querySelector('.space-y-6');
+  const div = document.createElement('div');
+  div.id = id;
+  div.className = 'fade-in flex flex-col items-start gap-2';
+  div.innerHTML = `
+    <div class="flex items-center gap-2">
+      <div class="w-8 h-8 rounded-xl bg-[#712ae2] flex items-center justify-center ai-glow">
+        <span class="material-symbols-outlined text-white text-[18px]">smart_toy</span>
+      </div>
+      <span class="text-sm font-bold text-[#712ae2]">HR Copilot</span>
+    </div>
+    <div class="bg-white border-l-4 border-[#712ae2] rounded-r-2xl shadow-sm border border-[#c3c6d7] px-5 py-4 ai-glow">
+      <div class="typing"><span></span><span></span><span></span></div>
+    </div>`;
+  container.appendChild(div);
+  scrollToBottom();
+  return id;
+}
+
+function streamChat(query, typingId) {
+  fetch(BASE_URL+'/api/chat', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({query, history: chatHistory.slice(-8)})
+  }).then(res => {
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder('utf-8', {fatal: false});
+    let fullText = '';
+    let card = null;
+    let citations = [];
+    let typingEl = document.getElementById(typingId);
+    let bubbleEl = null;
+    let buffer = '';
+
+    function processChunk({done, value}) {
+      if (done) return;
+      // stream:true 保证多字节字符不被截断
+      buffer += decoder.decode(value, {stream: true});
+      const lines = buffer.split('\n');
+      // 最后一行可能不完整，留到下次处理
+      buffer = lines.pop();
+      lines.forEach(line => {
+        line = line.trim();
+        if (!line.startsWith('data:')) return;
+        const raw = line.slice(5).trim();
+        try {
+          const obj = JSON.parse(raw);
+          if (obj.text) {
+            fullText += obj.text;
+            if (!bubbleEl) {
+              if (typingEl) {
+                typingEl.innerHTML = `
+                  <div class="flex items-center gap-2 mb-2">
+                    <div class="w-8 h-8 rounded-xl bg-[#712ae2] flex items-center justify-center" style="box-shadow:0 0 16px rgba(113,42,226,0.15)">
+                      <span class="material-symbols-outlined text-white text-[18px]">smart_toy</span>
+                    </div>
+                    <span class="text-sm font-bold text-[#712ae2]">HR Copilot</span>
+                  </div>
+                  <div id="${typingId}-bubble" class="bg-white border-l-4 border-[#712ae2] rounded-r-2xl shadow-sm border border-[#c3c6d7] px-5 py-4 max-w-[90%]" style="box-shadow:0 0 16px rgba(113,42,226,0.08)">
+                    <div id="${typingId}-text" class="text-sm text-[#0b1c30] leading-relaxed prose-ai streaming-cursor"></div>
+                  </div>`;
+                bubbleEl = document.getElementById(typingId + '-text');
+              }
+            }
+            if (bubbleEl) {
+              bubbleEl.innerHTML = formatAIText(fullText);
+              bubbleEl.classList.add('streaming-cursor');
+            }
+            scrollToBottom();
+          }
+          if (obj.done) {
+            card = obj.card;
+            citations = obj.citations || [];
+            if (bubbleEl) bubbleEl.classList.remove('streaming-cursor');
+            // 引用来源插入气泡内（bubbleEl的父级）
+            const bubbleBox = document.getElementById(typingId + '-bubble');
+            if (citations.length > 0 && bubbleBox) {
+              const citDiv = document.createElement('div');
+              citDiv.className = 'flex flex-wrap gap-1.5 mt-3 pt-3 border-t border-[#e5eeff]';
+              citations.forEach(c => {
+                const span = document.createElement('span');
+                span.className = 'inline-flex items-center gap-1 bg-[#eff4ff] text-[#004ac6] text-[11px] px-2 py-1 rounded-full border border-[#b4c5ff] cursor-default';
+                span.innerHTML = `<span class="material-symbols-outlined text-[12px]">link</span>${escHtml(c.policy)}`;
+                citDiv.appendChild(span);
+              });
+              bubbleBox.appendChild(citDiv);
+            }
+            // 业务卡片插在整个消息块之后（typingEl外层）
+            if (card && typingEl) {
+              const cardDiv = buildCard(card);
+              typingEl.appendChild(cardDiv);
+            }
+            chatHistory.push({role:'assistant', content: fullText});
+            scrollToBottom();
+          }
+        } catch(e){}
+      });
+      reader.read().then(processChunk);
+    }
+    reader.read().then(processChunk);
+  }).catch(err => {
+    const typingEl = document.getElementById(typingId);
+    if (typingEl) {
+      typingEl.querySelector('div:last-child').innerHTML = `<p class="text-sm text-red-500">连接失败，请稍后重试。</p>`;
+    }
+  });
+}
+
+function buildCard(card) {
+  const typeClass = {'action':'card-action', 'info':'card-info', 'alert':'card-alert'}[card.type] || 'card-info';
+  const btnColor = card.type === 'action' ? 'bg-[#004ac6] text-white hover:bg-[#003ea8]' :
+                   card.type === 'alert' ? 'bg-[#ba1a1a] text-white hover:bg-red-700' :
+                   'border border-[#004ac6] text-[#004ac6] hover:bg-[#eff4ff]';
+  const wrapper = document.createElement('div');
+  wrapper.className = 'mt-3 fade-in';
+  wrapper.innerHTML = `
+    <div class="${typeClass} rounded-2xl p-4 max-w-[320px] flex flex-col gap-3 shadow-sm">
+      <div class="flex items-start justify-between">
+        <div class="w-9 h-9 rounded-xl bg-[#e5eeff] flex items-center justify-center">
+          <span class="material-symbols-outlined text-[#004ac6] text-[20px]">${card.icon}</span>
+        </div>
+        <span class="text-[10px] font-bold uppercase tracking-wider bg-white px-2 py-0.5 rounded-full border border-[#c3c6d7] text-[#737686]">${card.type==='action'?'可办理':card.type==='alert'?'申诉':'可查询'}</span>
+      </div>
+      <div>
+        <h4 class="font-semibold text-sm">${card.title}</h4>
+        <p class="text-xs text-[#434655] mt-1 leading-relaxed">${card.desc}</p>
+        <p class="text-[10px] text-[#737686] mt-1.5 flex items-center gap-1">
+          <span class="material-symbols-outlined text-[12px]">schedule</span>${card.meta}
+        </p>
+      </div>
+      <button onclick="handleCardAction('${card.action}','${card.apply_type||''}')" 
+        class="${btnColor} w-full py-2 rounded-xl text-sm font-semibold transition-all active:scale-95">
+        ${card.btn}
+      </button>
+    </div>`;
+  return wrapper;
+}
+
+function handleCardAction(action, type) {
+  if (action === 'apply') {
+    showApplyModal(type);
+  } else {
+    showToast('查询功能 Demo 中（实际接入 HR 系统）');
+  }
+}
+
+function formatAIText(text) {
+  return text
+    .replace(/\n\n/g, '</p><p class="mt-2">')
+    .replace(/\n/g, '<br/>')
+    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+    .replace(/📌/g, '<span class="text-[#712ae2]">📌</span>');
+}
+
+function scrollToBottom() {
+  const el = document.getElementById('chat-messages');
+  el.scrollTop = el.scrollHeight;
+}
+
+// ============================================================
+// My Applications
+// ============================================================
+function loadMyApplications() {
+  fetch(BASE_URL+'/api/applications').then(r=>r.json()).then(data => {
+    const container = document.getElementById('my-applications');
+    if (!data.items.length) {
+      container.innerHTML = '<p class="text-sm text-[#737686] text-center py-10">暂无申请记录</p>';
+      return;
+    }
+    container.innerHTML = data.items.map(app => `
+      <div class="bg-white border border-[#c3c6d7] rounded-2xl p-4 fade-in flex items-center gap-4">
+        <div class="w-10 h-10 rounded-xl ${statusBg(app.status)} flex items-center justify-center shrink-0">
+          <span class="material-symbols-outlined text-[20px] ${statusColor(app.status)}">${statusIcon(app.status)}</span>
+        </div>
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center gap-2">
+            <span class="font-semibold text-sm">${app.type}</span>
+            <span class="text-[10px] px-2 py-0.5 rounded-full font-bold ${statusBadge(app.status)}">${statusLabel(app.status)}</span>
+          </div>
+          <p class="text-xs text-[#737686] mt-0.5 truncate">${app.note || '无备注'}</p>
+        </div>
+        <div class="text-right shrink-0">
+          <p class="text-xs font-medium">${app.id}</p>
+          <p class="text-[10px] text-[#737686]">${app.date}</p>
+        </div>
+      </div>`).join('');
+  });
+}
+
+// ============================================================
+// HR Knowledge Base
+// ============================================================
+function loadKB() {
+  const q = document.getElementById('kb-search')?.value || '';
+  const cat = document.getElementById('kb-category')?.value || '';
+  const url = `/api/kb?q=${encodeURIComponent(q)}&category=${encodeURIComponent(cat)}`;
+  fetch(url).then(r=>r.json()).then(data => {
+    const container = document.getElementById('kb-list');
+    const catColors = {休假:'bg-blue-50 text-blue-700', 薪酬:'bg-green-50 text-green-700', 社保:'bg-purple-50 text-purple-700', 考勤:'bg-yellow-50 text-yellow-700', 合同:'bg-orange-50 text-orange-700', 福利:'bg-pink-50 text-pink-700'};
+    container.innerHTML = `<p class="text-xs text-[#737686] mb-3">共 ${data.total} 条</p>` + data.items.map(item => `
+      <div class="bg-white border border-[#c3c6d7] rounded-2xl p-4 fade-in hover:border-[#b4c5ff] transition-all">
+        <div class="flex items-start gap-3">
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-2 mb-2">
+              <span class="text-[11px] font-bold px-2 py-0.5 rounded-full ${catColors[item.category]||'bg-gray-100 text-gray-600'}">${item.category}</span>
+              <span class="text-[11px] text-[#737686]">${item.policy}</span>
+            </div>
+            <p class="font-semibold text-sm text-[#0b1c30]">Q: ${escHtml(item.q)}</p>
+            <p class="text-xs text-[#434655] mt-1.5 leading-relaxed">A: ${escHtml(item.a)}</p>
+            <div class="flex flex-wrap gap-1 mt-2">
+              ${(item.tags||[]).map(t=>`<span class="text-[10px] bg-[#eff4ff] text-[#004ac6] px-2 py-0.5 rounded-full">#${t}</span>`).join('')}
+            </div>
+          </div>
+          <button onclick="deleteKB(${item.id})" class="shrink-0 text-[#737686] hover:text-red-500 transition p-1 rounded-lg hover:bg-red-50">
+            <span class="material-symbols-outlined text-[18px]">delete</span>
+          </button>
+        </div>
+      </div>`).join('');
+  });
+}
+
+function deleteKB(id) {
+  if (!confirm('确认删除该知识库条目？')) return;
+  fetch(`${BASE_URL}/api/kb/${id}`, {method:'DELETE'}).then(()=>loadKB());
+}
+
+function showAddKBModal() { document.getElementById('kb-modal').classList.remove('hidden'); }
+function closeKBModal() { document.getElementById('kb-modal').classList.add('hidden'); }
+
+function submitKB() {
+  const q = document.getElementById('kb-new-q').value.trim();
+  const a = document.getElementById('kb-new-a').value.trim();
+  if (!q || !a) { showToast('请填写问题和答案'); return; }
+  const tags = document.getElementById('kb-new-tags').value.split(',').map(t=>t.trim()).filter(Boolean);
+  fetch(BASE_URL+'/api/kb', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({
+      category: document.getElementById('kb-new-category').value,
+      policy: document.getElementById('kb-new-policy').value,
+      q, a, tags
+    })
+  }).then(()=>{
+    closeKBModal();
+    loadKB();
+    showToast('知识库条目添加成功');
+  });
+}
+
+// ============================================================
+// HR Approvals
+// ============================================================
+function filterApps(status) {
+  appFilterStatus = status;
+  document.querySelectorAll('.app-filter-btn').forEach(btn => {
+    const isActive = btn.dataset.filter === status;
+    btn.classList.toggle('active', isActive);
+    btn.classList.toggle('bg-[#004ac6]', isActive);
+    btn.classList.toggle('text-white', isActive);
+    btn.classList.toggle('border-[#004ac6]', isActive);
+    btn.classList.toggle('text-[#737686]', !isActive);
+  });
+  loadApprovals();
+}
+
+function loadApprovals() {
+  const url = `/api/applications${appFilterStatus ? '?status='+appFilterStatus : ''}`;
+  fetch(url).then(r=>r.json()).then(data => {
+    const container = document.getElementById('approval-list');
+    if (!data.items.length) {
+      container.innerHTML = '<p class="text-sm text-[#737686] text-center py-10">暂无申请记录</p>';
+      return;
+    }
+    container.innerHTML = data.items.map(app => `
+      <div class="bg-white border border-[#c3c6d7] rounded-2xl p-4 fade-in hover:border-[#b4c5ff] transition-all">
+        <div class="flex items-center gap-4">
+          <div class="w-10 h-10 rounded-xl ${statusBg(app.status)} flex items-center justify-center shrink-0">
+            <span class="material-symbols-outlined text-[20px] ${statusColor(app.status)}">${statusIcon(app.status)}</span>
+          </div>
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-2">
+              <span class="font-semibold text-sm">${app.applicant}</span>
+              <span class="text-[#737686] text-xs">·</span>
+              <span class="text-xs text-[#737686]">${app.dept}</span>
+              <span class="text-[10px] px-2 py-0.5 rounded-full font-bold ml-1 ${statusBadge(app.status)}">${statusLabel(app.status)}</span>
+            </div>
+            <p class="text-sm font-medium text-[#004ac6] mt-0.5">${app.type}</p>
+            <p class="text-xs text-[#737686] mt-0.5 truncate">${app.note || '无说明'}</p>
+          </div>
+          <div class="flex items-center gap-2 shrink-0">
+            <span class="text-xs text-[#737686]">${app.date}</span>
+            ${app.status === 'pending' ? `
+              <button onclick="approveApp('${app.id}')" class="px-3 py-1.5 bg-green-500 text-white rounded-lg text-xs font-semibold hover:bg-green-600 transition active:scale-95">通过</button>
+              <button onclick="rejectApp('${app.id}')" class="px-3 py-1.5 bg-red-50 text-red-500 border border-red-200 rounded-lg text-xs font-semibold hover:bg-red-100 transition active:scale-95">拒绝</button>` : ''}
+          </div>
+        </div>
+      </div>`).join('');
+  });
+}
+
+function approveApp(id) {
+  fetch(`${BASE_URL}/api/applications/${id}/approve`, {method:'POST'}).then(()=>{
+    showToast('已通过申请');
+    loadApprovals();
+  });
+}
+function rejectApp(id) {
+  fetch(`${BASE_URL}/api/applications/${id}/reject`, {method:'POST'}).then(()=>{
+    showToast('已拒绝申请');
+    loadApprovals();
+  });
+}
+
+// ============================================================
+// Analytics
+// ============================================================
+function loadAnalytics() {
+  fetch(BASE_URL+'/api/stats').then(r=>r.json()).then(s => {
+    const container = document.getElementById('analytics-content');
+    const catBars = Object.entries(s.category_dist).map(([cat, pct]) => `
+      <div class="flex items-center gap-3">
+        <span class="text-xs w-10 text-right text-[#434655]">${cat}</span>
+        <div class="flex-1 h-2 bg-[#e5eeff] rounded-full overflow-hidden">
+          <div class="h-full bg-[#004ac6] rounded-full" style="width:${pct}%"></div>
+        </div>
+        <span class="text-xs text-[#737686] w-6">${pct}%</span>
+      </div>`).join('');
+    
+    container.innerHTML = `
+      <div class="analytics-grid grid grid-cols-4 gap-4 mb-6">
+        ${[
+          {label:'累计问答量', value: s.total_queries.toLocaleString(), icon:'quiz', color:'bg-[#e5eeff] text-[#004ac6]'},
+          {label:'已解决问题', value: s.resolved.toLocaleString(), icon:'check_circle', color:'bg-green-50 text-green-600'},
+          {label:'待处理申请', value: s.pending_apps, icon:'pending_actions', color:'bg-orange-50 text-orange-500'},
+          {label:'知识库条目', value: s.kb_articles, icon:'menu_book', color:'bg-purple-50 text-purple-600'},
+        ].map(card => `
+          <div class="bg-white border border-[#c3c6d7] rounded-2xl p-5 flex flex-col gap-3 fade-in">
+            <div class="w-10 h-10 rounded-xl ${card.color} flex items-center justify-center">
+              <span class="material-symbols-outlined text-[20px]">${card.icon}</span>
+            </div>
+            <div>
+              <p class="text-2xl font-bold">${card.value}</p>
+              <p class="text-xs text-[#737686] mt-0.5">${card.label}</p>
+            </div>
+          </div>`).join('')}
+      </div>
+      <div class="grid grid-cols-2 gap-4">
+        <div class="bg-white border border-[#c3c6d7] rounded-2xl p-5 fade-in">
+          <h3 class="font-semibold text-sm mb-4">问题分类分布</h3>
+          <div class="space-y-3">${catBars}</div>
+        </div>
+        <div class="bg-white border border-[#c3c6d7] rounded-2xl p-5 fade-in">
+          <h3 class="font-semibold text-sm mb-4">服务质量指标</h3>
+          <div class="space-y-4">
+            ${[
+              {label:'知识库命中率', val: Math.round(s.resolved/s.total_queries*100)+'%', color:'bg-[#004ac6]'},
+              {label:'申请处理及时率', val:'91%', color:'bg-green-500'},
+              {label:'用户满意度', val:'88%', color:'bg-purple-500'},
+            ].map(m => `
+              <div>
+                <div class="flex justify-between text-xs mb-1.5">
+                  <span class="text-[#434655]">${m.label}</span>
+                  <span class="font-bold">${m.val}</span>
+                </div>
+                <div class="h-2 bg-[#e5eeff] rounded-full overflow-hidden">
+                  <div class="h-full ${m.color} rounded-full" style="width:${m.val}"></div>
+                </div>
+              </div>`).join('')}
+          </div>
+        </div>
+      </div>`;
+  });
+}
+
+// ============================================================
+// Apply Modal
+// ============================================================
+function showApplyModal(type) {
+  document.getElementById('apply-modal').classList.remove('hidden');
+  document.getElementById('modal-type').value = type || '在职证明';
+}
+function quickApply(type) { showApplyModal(type); }
+function closeModal() { document.getElementById('apply-modal').classList.add('hidden'); }
+
+function submitApplication() {
+  const type = document.getElementById('modal-type').value;
+  const name = document.getElementById('modal-name').value.trim();
+  const dept = document.getElementById('modal-dept').value.trim();
+  const note = document.getElementById('modal-note').value.trim();
+  if (!name) { showToast('请填写申请人姓名'); return; }
+  
+  fetch(BASE_URL+'/api/applications', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({type, applicant: name, dept, note})
+  }).then(r=>r.json()).then(data => {
+    closeModal();
+    showToast(`申请已提交！编号：${data.app.id}`);
+    document.getElementById('modal-note').value = '';
+    if (currentPage === 'workflow') loadMyApplications();
+  });
+}
+
+// ============================================================
+// Utilities
+// ============================================================
+function statusLabel(s) { return {pending:'待审批', approved:'已通过', rejected:'已拒绝'}[s] || s; }
+function statusBg(s) { return {pending:'bg-orange-50', approved:'bg-green-50', rejected:'bg-red-50'}[s] || 'bg-gray-50'; }
+function statusColor(s) { return {pending:'text-orange-500', approved:'text-green-500', rejected:'text-red-500'}[s] || ''; }
+function statusIcon(s) { return {pending:'pending', approved:'check_circle', rejected:'cancel'}[s] || 'help'; }
+function statusBadge(s) { return {pending:'bg-orange-50 text-orange-600 border border-orange-200', approved:'bg-green-50 text-green-600 border border-green-200', rejected:'bg-red-50 text-red-600 border border-red-200'}[s] || ''; }
+
+function escHtml(str) {
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function showToast(msg) {
+  const toast = document.createElement('div');
+  toast.className = 'fixed bottom-6 left-1/2 -translate-x-1/2 bg-[#0b1c30] text-white text-sm px-5 py-3 rounded-2xl shadow-xl z-[200] fade-in flex items-center gap-2';
+  toast.innerHTML = `<span class="material-symbols-outlined text-green-400 text-[16px]">check_circle</span>${escHtml(msg)}`;
+  document.body.appendChild(toast);
+  setTimeout(()=>toast.remove(), 3000);
+}
+
+// Close modals on overlay click
+document.getElementById('apply-modal').addEventListener('click', function(e){
+  if(e.target === this) closeModal();
+});
+document.getElementById('kb-modal').addEventListener('click', function(e){
+  if(e.target === this) closeKBModal();
+});
+
+// Init filter buttons style
+document.querySelectorAll('.app-filter-btn').forEach(btn => {
+  if(btn.dataset.filter === '') {
+    btn.classList.add('bg-[#004ac6]','text-white','border-[#004ac6]');
+  }
+});
+</script>
+</body>
+</html>
