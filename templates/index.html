@@ -287,9 +287,14 @@
         <h1 class="text-xl font-bold">知识库管理</h1>
         <p class="text-sm text-[#737686] mt-0.5">维护 HR 政策知识库，支持员工 AI 问答</p>
       </div>
-      <button onclick="showAddKBModal()" class="flex items-center gap-2 bg-[#004ac6] text-white px-4 py-2 rounded-xl text-sm font-semibold hover:bg-[#003ea8] transition-all">
-        <span class="material-symbols-outlined text-[16px]">add</span> 添加条目
-      </button>
+      <div class="flex gap-2">
+        <button onclick="showUploadModal()" class="flex items-center gap-2 bg-[#712ae2] text-white px-4 py-2 rounded-xl text-sm font-semibold hover:bg-[#5a00c6] transition-all">
+          <span class="material-symbols-outlined text-[16px]">upload_file</span> 上传文档
+        </button>
+        <button onclick="showAddKBModal()" class="flex items-center gap-2 bg-[#004ac6] text-white px-4 py-2 rounded-xl text-sm font-semibold hover:bg-[#003ea8] transition-all">
+          <span class="material-symbols-outlined text-[16px]">add</span> 添加条目
+        </button>
+      </div>
     </div>
     <div class="p-4 border-b border-[#c3c6d7] bg-white">
       <div class="flex gap-3 max-w-xl">
@@ -301,7 +306,17 @@
       </div>
     </div>
     <div class="flex-1 overflow-y-auto p-6">
-      <div id="kb-list" class="max-w-4xl mx-auto space-y-3"></div>
+      <div class="max-w-4xl mx-auto mb-4">
+      <div id="vector-status" class="flex items-center gap-3 bg-[#f0edff] border border-[#d2bbff] rounded-xl px-4 py-2.5 text-sm">
+        <span class="material-symbols-outlined text-[#712ae2] text-[18px]">hub</span>
+        <span class="text-[#434655]">向量库：<strong id="vec-count" class="text-[#712ae2]">加载中...</strong> 条向量</span>
+        <span class="text-[#c3c6d7]">·</span>
+        <span class="text-[#434655]">Embedding 模型：<strong class="text-[#004ac6]">text-embedding-v3</strong></span>
+        <span class="text-[#c3c6d7]">·</span>
+        <span class="text-[#434655]">数据库：<strong class="text-green-600">SQLite ✓</strong></span>
+      </div>
+    </div>
+    <div id="kb-list" class="max-w-4xl mx-auto space-y-3"></div>
     </div>
   </div>
 
@@ -368,6 +383,70 @@
     <div class="flex gap-3 mt-6">
       <button onclick="closeModal()" class="flex-1 py-2.5 border border-[#c3c6d7] rounded-xl text-sm font-medium text-[#434655] hover:bg-[#f8f9ff] transition">取消</button>
       <button onclick="submitApplication()" class="flex-1 py-2.5 bg-[#004ac6] text-white rounded-xl text-sm font-semibold hover:bg-[#003ea8] transition active:scale-95">提交申请</button>
+    </div>
+  </div>
+</div>
+
+<!-- Upload File Modal -->
+<div id="upload-modal" class="modal-overlay hidden">
+  <div class="modal-box" style="width:520px">
+    <div class="flex items-center justify-between mb-5">
+      <div>
+        <h2 class="text-lg font-bold">上传政策文档</h2>
+        <p class="text-xs text-[#737686] mt-0.5">支持 PDF / Word / TXT，自动切片并向量化入库</p>
+      </div>
+      <button onclick="closeUploadModal()" class="text-[#737686] hover:text-[#0b1c30]">
+        <span class="material-symbols-outlined">close</span>
+      </button>
+    </div>
+    <div class="space-y-4">
+      <!-- 拖拽区域 -->
+      <div id="drop-zone" onclick="document.getElementById('file-input').click()"
+        class="border-2 border-dashed border-[#b4c5ff] rounded-xl p-8 text-center cursor-pointer hover:border-[#004ac6] hover:bg-[#f8f9ff] transition-all">
+        <span class="material-symbols-outlined text-[40px] text-[#737686] block mb-2">upload_file</span>
+        <p class="text-sm font-medium text-[#434655]">点击或拖拽文件到此处</p>
+        <p class="text-xs text-[#737686] mt-1">PDF / Word(.docx) / TXT，最大 20MB</p>
+        <input id="file-input" type="file" accept=".pdf,.docx,.doc,.txt" class="hidden" onchange="onFileSelect(this)"/>
+      </div>
+      <!-- 已选文件 -->
+      <div id="selected-file" class="hidden bg-[#eff4ff] rounded-xl px-4 py-3 flex items-center gap-3">
+        <span class="material-symbols-outlined text-[#004ac6] text-[24px]">description</span>
+        <div class="flex-1 min-w-0">
+          <p id="selected-filename" class="text-sm font-semibold truncate"></p>
+          <p id="selected-filesize" class="text-xs text-[#737686]"></p>
+        </div>
+        <button onclick="clearFile()" class="text-[#737686] hover:text-red-500 transition">
+          <span class="material-symbols-outlined text-[18px]">close</span>
+        </button>
+      </div>
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="block text-sm font-medium text-[#434655] mb-1.5">分类</label>
+          <select id="upload-category" class="w-full px-3 py-2.5 border border-[#c3c6d7] rounded-xl text-sm focus:outline-none focus:border-[#004ac6]">
+            <option>休假</option><option>薪酬</option><option>社保</option><option>考勤</option><option>合同</option><option>福利</option><option>其他</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-[#434655] mb-1.5">政策来源标注（选填）</label>
+          <input id="upload-policy" type="text" placeholder="如：《员工手册》2024版" class="w-full px-3 py-2.5 border border-[#c3c6d7] rounded-xl text-sm focus:outline-none focus:border-[#004ac6]"/>
+        </div>
+      </div>
+      <!-- 进度条 -->
+      <div id="upload-progress" class="hidden">
+        <div class="flex items-center gap-2 mb-2">
+          <div class="w-4 h-4 border-2 border-[#004ac6] border-t-transparent rounded-full animate-spin"></div>
+          <span class="text-sm text-[#434655]" id="upload-status">正在上传...</span>
+        </div>
+        <div class="h-1.5 bg-[#e5eeff] rounded-full overflow-hidden">
+          <div id="upload-bar" class="h-full bg-[#004ac6] rounded-full transition-all" style="width:0%"></div>
+        </div>
+      </div>
+    </div>
+    <div class="flex gap-3 mt-6">
+      <button onclick="closeUploadModal()" class="flex-1 py-2.5 border border-[#c3c6d7] rounded-xl text-sm font-medium text-[#434655] hover:bg-[#f8f9ff] transition">取消</button>
+      <button onclick="submitUpload()" id="upload-btn" class="flex-1 py-2.5 bg-[#712ae2] text-white rounded-xl text-sm font-semibold hover:bg-[#5a00c6] transition active:scale-95">
+        开始上传
+      </button>
     </div>
   </div>
 </div>
@@ -497,7 +576,7 @@ function showPage(page) {
   if (navEl) navEl.classList.add('active');
   // Load data
   if (page === 'workflow') loadMyApplications();
-  if (page === 'hr-knowledge') loadKB();
+  if (page === 'hr-knowledge') { loadKB(); loadVectorStatus(); }
   if (page === 'hr-approval') loadApprovals();
   if (page === 'hr-analytics') loadAnalytics();
 }
@@ -772,6 +851,81 @@ function deleteKB(id) {
 function showAddKBModal() { document.getElementById('kb-modal').classList.remove('hidden'); }
 function closeKBModal() { document.getElementById('kb-modal').classList.add('hidden'); }
 
+// ============================================================
+// 文件上传
+// ============================================================
+let selectedFile = null;
+
+function showUploadModal() { document.getElementById('upload-modal').classList.remove('hidden'); }
+function closeUploadModal() {
+  document.getElementById('upload-modal').classList.add('hidden');
+  clearFile();
+  document.getElementById('upload-progress').classList.add('hidden');
+  document.getElementById('upload-bar').style.width = '0%';
+}
+
+function onFileSelect(input) {
+  const file = input.files[0];
+  if (!file) return;
+  selectedFile = file;
+  document.getElementById('selected-file').classList.remove('hidden');
+  document.getElementById('drop-zone').classList.add('hidden');
+  document.getElementById('selected-filename').textContent = file.name;
+  document.getElementById('selected-filesize').textContent = (file.size/1024/1024).toFixed(2) + ' MB';
+}
+
+function clearFile() {
+  selectedFile = null;
+  document.getElementById('file-input').value = '';
+  document.getElementById('selected-file').classList.add('hidden');
+  document.getElementById('drop-zone').classList.remove('hidden');
+}
+
+function submitUpload() {
+  if (!selectedFile) { showToast('请先选择文件'); return; }
+  const btn = document.getElementById('upload-btn');
+  btn.disabled = true;
+  document.getElementById('upload-progress').classList.remove('hidden');
+  document.getElementById('upload-status').textContent = '正在上传并解析...';
+  document.getElementById('upload-bar').style.width = '30%';
+
+  const form = new FormData();
+  form.append('file', selectedFile);
+  form.append('category', document.getElementById('upload-category').value);
+  form.append('policy', document.getElementById('upload-policy').value);
+
+  fetch(BASE_URL+'/api/kb/upload', { method:'POST', body: form })
+    .then(r=>r.json())
+    .then(data => {
+      document.getElementById('upload-bar').style.width = '100%';
+      document.getElementById('upload-status').textContent = data.message || '上传成功';
+      btn.disabled = false;
+      setTimeout(()=>{ closeUploadModal(); loadKB(); loadVectorStatus(); showToast(data.message || '上传成功！'); }, 1500);
+    })
+    .catch(()=>{ showToast('上传失败，请重试'); btn.disabled=false; });
+}
+
+// 拖拽上传
+document.addEventListener('DOMContentLoaded', () => {
+  const dz = document.getElementById('drop-zone');
+  if (!dz) return;
+  dz.addEventListener('dragover', e=>{ e.preventDefault(); dz.classList.add('border-[#004ac6]','bg-[#f0edff]'); });
+  dz.addEventListener('dragleave', ()=>dz.classList.remove('border-[#004ac6]','bg-[#f0edff]'));
+  dz.addEventListener('drop', e=>{
+    e.preventDefault();
+    dz.classList.remove('border-[#004ac6]','bg-[#f0edff]');
+    const file = e.dataTransfer.files[0];
+    if (file) { document.getElementById('file-input').files = e.dataTransfer.files; onFileSelect(document.getElementById('file-input')); }
+  });
+});
+
+function loadVectorStatus() {
+  fetch(BASE_URL+'/api/vector/status').then(r=>r.json()).then(d=>{
+    const el = document.getElementById('vec-count');
+    if (el) el.textContent = d.count;
+  }).catch(()=>{});
+}
+
 function submitKB() {
   const q = document.getElementById('kb-new-q').value.trim();
   const a = document.getElementById('kb-new-a').value.trim();
@@ -973,6 +1127,9 @@ document.getElementById('apply-modal').addEventListener('click', function(e){
 });
 document.getElementById('kb-modal').addEventListener('click', function(e){
   if(e.target === this) closeKBModal();
+});
+document.getElementById('upload-modal').addEventListener('click', function(e){
+  if(e.target === this) closeUploadModal();
 });
 
 // Init filter buttons style
